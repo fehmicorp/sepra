@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,25 +16,16 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func RunWebServer() {
+func main() {
 	port := getEnv("PORT", defPort)
 	host := getEnv("HOST", defHost)
 	dir := getEnv("APPDIR", defDir)
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "OK", "service": "backend-api"})
-	})
-	mux.HandleFunc("POST /api/data", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"message": "Data received successfully"}`))
-	})
-	RegisterStaticApp(mux, "/auth", filepath.Join(dir, "auth"))
-	RegisterStaticApp(mux, "/home", filepath.Join(dir, "home"))
+	url := fmt.Sprintf("/%s", pkgId)
+	RegisterStaticApp(mux, url, filepath.Join(dir, pkgId))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
-			http.Redirect(w, r, "/auth", http.StatusSeeOther)
+			http.Redirect(w, r, url, http.StatusSeeOther)
 			return
 		}
 		http.NotFound(w, r)
@@ -53,7 +43,6 @@ func RegisterStaticApp(mux *http.ServeMux, prefix string, appDir string) {
 	}
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		// Strip the prefix (e.g., /auth/signin -> /signin)
 		cleanPath := strings.TrimPrefix(r.URL.Path, prefix)
 		cleanPath = strings.TrimPrefix(filepath.Clean(cleanPath), "/")
 

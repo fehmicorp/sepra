@@ -1,4 +1,4 @@
-module app
+module auth
 
 go 1.26.4
 
