@@ -1,10 +1,36 @@
 package env
 
 import (
+	"encoding/json"
 	"os"
 	"strconv"
 	"time"
 )
+
+func LoadConfig(filename string, configPtr interface{}, defaults interface{}) (interface{}, error) {
+	// 1. Pre-populate configPtr with default values by marshaling and unmarshaling defaults
+	defaultBytes, err := json.Marshal(defaults)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(defaultBytes, configPtr); err != nil {
+		return nil, err
+	}
+	// 2. Check if the config file exists. If it doesn't, return the default-populated struct.
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		return configPtr, nil
+	}
+	// 3. Read the configuration file from disk
+	fileData, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	// 4. Unmarshal file contents into the config struct, overriding any defaults
+	if err := json.Unmarshal(fileData, configPtr); err != nil {
+		return nil, err
+	}
+	return configPtr, nil
+}
 
 func GetString(key, defaultValue string) string {
 	if val, exists := os.LookupEnv(key); exists && val != "" {

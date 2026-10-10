@@ -1,39 +1,55 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
+	"minio/utils"
 	"time"
 
-	"github.com/minio/minio-go/pkg/credentials"
 	"github.com/minio/minio-go/v7"
 )
 
 var (
-	minioClient     *minio.Client
-	endpoint        = env.GetString("APP_ENDPOINT", "9090")
-	accessKeyID     = env.GetString("APP_ACCESS_KEY_ID", "minioadmin")
-	secretAccessKey = env.GetString("APP_SECRET_ACCESS_KEY", "minioadmin")
-	useSSL          = env.GetBool("APP_USE_SSL", false)
-	maxConnections  = env.GetInt("APP_MAX_CONNECTIONS", 10)
-	debugMode       = env.GetBool("APP_DEBUG_MODE", false)
-	timeout         = env.GetDuration("APP_TIMEOUT", 30*time.Second)
+	minioClient *minio.Client
 )
 
 func main() {
-	ctx := context.Background()
-	// 1. Initialize MinIO client object
-	minioClient, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
-		Secure: useSSL,
-	})
+	// rawCfg, err := env.LoadConfig("config.yaml", &Config{}, &Config{})
+	// if err != nil {
+	// 	log.Fatalf("Failed to load config: %v", err)
+	// }
+
+	// cfg := rawCfg.(*Config)
+	// fmt.Printf("Config Loaded Successfully:\n")
+	// fmt.Printf("  Port:             %d\n", cfg.Port)
+	// fmt.Printf("  AccessKeyID:      %s\n", cfg.AccessKeyID)
+	// fmt.Printf("  MaxConnections:   %d\n", cfg.MaxConnections)
+	// fmt.Printf("  DebugMode:        %t\n", cfg.DebugMode)
+	// fmt.Printf("  Timeout:          %s\n", cfg.Timeout)
+
+	// minVal, err := utils.ConvertDuration(cfg.Timeout, "ms")
+	// if err != nil {
+	// 	log.Fatalf("Error: %v", err)
+	// }
+	// fmt.Printf("Timeout in milliseconds: %.0f ms\n", minVal)
+
+	postTime, err := utils.CalcDuration(time.Time{}, "1", "d", false)
 	if err != nil {
-		log.Fatalln("Failed to initialize MinIO client:", err)
+		log.Fatalf("Error: %v", err)
 	}
+	fmt.Printf("After 1 Day:   %s\n", postTime.Format(time.RFC1123))
 
-	fmt.Println("Successfully connected to MinIO!")
+	// // 1. Initialize MinIO client object
+	// minioClient, err := minio.New(cfg.Port, &minio.Options{
+	// 	Creds:  credentials.NewStaticV4(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
+	// 	Secure: cfg.UseSSL,
+	// })
+	// if err != nil {
+	// 	log.Fatalln("Failed to initialize MinIO client:", err)
+	// }
 
-	bucketName := "my-test-bucket"
-	location := "us-east-1"
+	// fmt.Println("Successfully connected to MinIO!")
+
+	// bucketName := "my-test-bucket"
+	// location := "us-east-1"
 }

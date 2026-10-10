@@ -1,0 +1,7 @@
+port: 9090
+access_key_id: minio
+secret_access_key: minio123
+use_ssl: false
+max_connections: 100
+debug_mode: false
+timeout: 30s
