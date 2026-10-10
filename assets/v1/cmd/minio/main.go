@@ -1,61 +1,89 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"minio/env"
 	"minio/utils"
-	"time"
 
 	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-var (
-	minioClient *minio.Client
-)
+var minioClient *minio.Client
 
 func main() {
-	// rawCfg, err := env.LoadConfig("config.yaml", &Config{}, &Config{})
-	// if err != nil {
-	// 	log.Fatalf("Failed to load config: %v", err)
-	// }
+	ctx := context.Background()
 
-	// cfg := rawCfg.(*Config)
-	// fmt.Printf("Config Loaded Successfully:\n")
-	// fmt.Printf("  Port:             %d\n", cfg.Port)
-	// fmt.Printf("  AccessKeyID:      %s\n", cfg.AccessKeyID)
-	// fmt.Printf("  MaxConnections:   %d\n", cfg.MaxConnections)
-	// fmt.Printf("  DebugMode:        %t\n", cfg.DebugMode)
-	// fmt.Printf("  Timeout:          %s\n", cfg.Timeout)
+	// Load configuration
+	rawCfg, err := env.LoadConfig("config.yaml", &Config{}, &Config{})
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+	cfg := rawCfg.(*Config)
 
-	// minVal, err := utils.ConvertDuration(cfg.Timeout, "ms")
-	// if err != nil {
-	// 	log.Fatalf("Error: %v", err)
-	// }
-	// fmt.Printf("Timeout in milliseconds: %.0f ms\n", minVal)
+	fmt.Printf("Config Loaded Successfully:\n")
+	fmt.Printf("  Port:             %d\n", cfg.Port)
+	fmt.Printf("  AccessKeyID:      %s\n", cfg.AccessKeyID)
+	fmt.Printf("  MaxConnections:   %d\n", cfg.MaxConnections)
+	fmt.Printf("  DebugMode:        %t\n", cfg.DebugMode)
+	fmt.Printf("  Timeout:          %s\n", cfg.Timeout)
 
-	postTime, err := utils.CalcDuration("add", "5", "m", false)
+	// Ensure Data Directory
+	dataDir, err := utils.EnsureDir(cfg.DataDir, true)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
-	fmt.Printf("Current Time:   %s\n", utils.GetCurrentTime().Format(time.ANSIC))
-	diffTime, err := utils.CalcDifference(time.Now(), postTime, "m")
+	fmt.Printf("Data directory: %s\n", dataDir)
+
+	// Ensure Backup Directory
+	backupDir, err := utils.EnsureDir(cfg.BackupDir, true)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
-	fmt.Printf("Difference:     %.0f minutes\n", diffTime)
-	fmt.Printf("After 5 Minutes:   %s\n", postTime.Format(time.ANSIC))
+	fmt.Printf("Backup directory: %s\n", backupDir)
 
-	// // 1. Initialize MinIO client object
-	// minioClient, err := minio.New(cfg.Port, &minio.Options{
-	// 	Creds:  credentials.NewStaticV4(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
-	// 	Secure: cfg.UseSSL,
-	// })
+	// Parse timeout duration to milliseconds
+	minVal, err := utils.ConvertDuration(cfg.Timeout, "ms")
+	if err != nil {
+		log.Fatalf("Error: %v", err)
+	}
+	fmt.Printf("Timeout in milliseconds: %.0f ms\n", minVal)
+
+	// Parse timeout as time.Duration for MinIO client options
+	// parsedTimeout, err := time.ParseDuration(cfg.Timeout)
 	// if err != nil {
-	// 	log.Fatalln("Failed to initialize MinIO client:", err)
+	// 	parsedTimeout = 30 * time.Second // fallback
 	// }
 
-	// fmt.Println("Successfully connected to MinIO!")
+	// 1. Initialize MinIO client object (using v7 credentials)
+	minioClientAddress := fmt.Sprintf("0.0.0.0:%d", cfg.Port)
+	minioClient, err = minio.New(minioClientAddress, &minio.Options{
+		Creds:        credentials.NewStaticV4(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
+		Secure:       cfg.UseSSL,
+		MaxRetries:   cfg.MaxConnections,
+		BucketLookup: minio.BucketLookupAuto,
+	})
+	if err != nil {
+		log.Fatalln("Failed to initialize MinIO client:", err)
+	}
 
-	// bucketName := "my-test-bucket"
-	// location := "us-east-1"
+	// 2. Check and Create Bucket
+	bucketName := "bin"
+	location := cfg.Region
+	exists, err := minioClient.BucketExists(ctx, bucketName)
+	if err != nil {
+		log.Fatalln("Error checking bucket existence:", err)
+	}
+
+	if !exists {
+		err = minioClient.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{Region: location})
+		if err != nil {
+			log.Fatalf("Failed to create bucket %s: %v\n", bucketName, err)
+		}
+		fmt.Printf("Successfully created bucket: %s\n", bucketName)
+	} else {
+		fmt.Printf("Bucket %s already exists\n", bucketName)
+	}
 }

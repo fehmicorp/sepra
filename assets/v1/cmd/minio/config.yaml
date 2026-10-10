@@ -5,3 +5,4 @@ use_ssl: false
 max_connections: 100
 debug_mode: false
 timeout: 30s
+region: ap-south-1 
