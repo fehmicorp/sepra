@@ -33,11 +33,17 @@ func main() {
 	// }
 	// fmt.Printf("Timeout in milliseconds: %.0f ms\n", minVal)
 
-	postTime, err := utils.CalcDuration(time.Time{}, "1", "d", false)
+	postTime, err := utils.CalcDuration("add", "5", "m", false)
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
-	fmt.Printf("After 1 Day:   %s\n", postTime.Format(time.RFC1123))
+	fmt.Printf("Current Time:   %s\n", utils.GetCurrentTime().Format(time.ANSIC))
+	diffTime, err := utils.CalcDifference(time.Now(), postTime, "m")
+	if err != nil {
+		log.Fatalf("Error: %v", err)
+	}
+	fmt.Printf("Difference:     %.0f minutes\n", diffTime)
+	fmt.Printf("After 5 Minutes:   %s\n", postTime.Format(time.ANSIC))
 
 	// // 1. Initialize MinIO client object
 	// minioClient, err := minio.New(cfg.Port, &minio.Options{

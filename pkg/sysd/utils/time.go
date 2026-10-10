@@ -30,28 +30,92 @@ func GetCurrentTimeInLocationFormatted(locationName, layout string) (string, err
 	return time.Now().In(loc).Format(layout), nil
 }
 
-func GetPostDuration(baseTime time.Time, valueStr string, unit string) (time.Time, error) {
+func CalcDuration(tp string, valueStr string, unit string, roundoff bool, baseTime ...time.Time) (time.Time, error) {
+	// Handle optional baseTime (default to time.Now() if not provided or zero)
+	var t time.Time
+	if len(baseTime) == 0 || baseTime[0].IsZero() {
+		t = time.Now()
+	} else {
+		t = baseTime[0]
+	}
+
 	val, err := strconv.Atoi(valueStr)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("invalid value format %q: %w", valueStr, err)
 	}
+
+	var result time.Time
+	tFunc := func(d time.Duration) time.Time {
+		switch tp {
+		case "add":
+			return t.Add(d)
+		case "sub":
+			return t.Add(-d)
+		default:
+			return t.Add(d)
+		}
+	}
+
 	switch unit {
 	case "s", "sec", "seconds":
-		return baseTime.Add(time.Duration(val) * time.Second), nil
+		result = tFunc(time.Duration(val) * time.Second)
+		if roundoff {
+			interval := 5 * time.Second
+			result = result.Round(interval)
+		}
 	case "m", "min", "minutes":
-		return baseTime.Add(time.Duration(val) * time.Minute), nil
+		result = tFunc(time.Duration(val) * time.Minute)
+		if roundoff {
+			interval := 30 * time.Second
+			result = result.Round(interval)
+		}
 	case "h", "hour", "hours":
-		return baseTime.Add(time.Duration(val) * time.Hour), nil
+		result = tFunc(time.Duration(val) * time.Hour)
+		if roundoff {
+			result = result.Round(time.Hour)
+		}
 	case "d", "day", "days":
-		return baseTime.AddDate(0, 0, val), nil
+		result = tFunc(time.Duration(val) * 24 * time.Hour)
+		if roundoff {
+			// Round to the start of the local day (Midnight 00:00:00)
+			y, m, d := result.Date()
+			result = time.Date(y, m, d, 0, 0, 0, 0, result.Location())
+		}
 	case "w", "week", "weeks":
-		return baseTime.AddDate(0, 0, val*7), nil
-	case "mo", "month", "months":
-		return baseTime.AddDate(0, val, 0), nil
+		result = tFunc(time.Duration(val) * 7 * 24 * time.Hour)
+		if roundoff {
+			// Round to the start of the local day (Midnight 00:00:00)
+			y, m, d := result.Date()
+			result = time.Date(y, m, d, 0, 0, 0, 0, result.Location())
+		}
 	case "y", "year", "years":
-		return baseTime.AddDate(val, 0, 0), nil
+		result = tFunc(time.Duration(val) * 365 * 24 * time.Hour)
+		if roundoff {
+			y := result.Year()
+			result = time.Date(y, time.January, 1, 0, 0, 0, 0, result.Location())
+		}
 	default:
 		return time.Time{}, fmt.Errorf("unsupported time unit: %s", unit)
+	}
+
+	return result, nil
+}
+
+func CalcDifference(startTime, endTime time.Time, unit string) (float64, error) {
+	if endTime.Before(startTime) {
+		return 0, fmt.Errorf("end time %v is before start time %v", endTime, startTime)
+	}
+	diff := endTime.Sub(startTime)
+
+	switch unit {
+	case "s", "sec", "seconds":
+		return diff.Seconds(), nil
+	case "m", "min", "minutes":
+		return diff.Minutes(), nil
+	case "h", "hour", "hours":
+		return diff.Hours(), nil
+	default:
+		return 0, fmt.Errorf("unsupported time unit: %s", unit)
 	}
 }
 
