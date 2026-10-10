@@ -1,3 +1,3 @@
-module github.com/fehmicorp.in/sepra/pkg/sysd
+module github.com/fehmicorp/sepra/pkg/sysd
 
 go 1.26.4
