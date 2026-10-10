@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/minio/minio-go/pkg/credentials"
 	"github.com/minio/minio-go/v7"
@@ -15,6 +16,9 @@ var (
 	accessKeyID     = env.GetString("APP_ACCESS_KEY_ID", "minioadmin")
 	secretAccessKey = env.GetString("APP_SECRET_ACCESS_KEY", "minioadmin")
 	useSSL          = env.GetBool("APP_USE_SSL", false)
+	maxConnections  = env.GetInt("APP_MAX_CONNECTIONS", 10)
+	debugMode       = env.GetBool("APP_DEBUG_MODE", false)
+	timeout         = env.GetDuration("APP_TIMEOUT", 30*time.Second)
 )
 
 func main() {
