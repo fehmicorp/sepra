@@ -1,4 +1,4 @@
-module minio
+module s3
 
 go 1.26.4
 
@@ -10,6 +10,7 @@ require (
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/fehmicorp/sepra/pkg/sysd v0.0.0-20261010115810-35ac0cf3a278 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.19.2 // indirect
