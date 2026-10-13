@@ -7,33 +7,36 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"res/env"
 	"time"
 
-	"github.com/fehmicorp/sepra/pkg/sysd/env"
 	"github.com/minio/minio-go/v7"
 )
 
+var minioClient *minio.Client
+var cfg *Config
+var (
+	serviceToken = env.GetString("APP_SECRET_ACCESS_TOKEN", "")
+	Port         = env.GetInt("APP_PORT", 9098)
+)
+
 func main() {
-	rawCfg, err := env.LoadConfig("config1.yaml", &Config{}, &Config{})
-	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
-	}
-	cfg = rawCfg.(*Config)
+	fmt.Println(Port)
 	mux := http.NewServeMux()
-	RegisterS3Routes(mux, cfg.SecretAccessToken)
-	CreateDownloadUrl(mux, cfg.SecretAccessToken)
-	serverAddr := fmt.Sprintf(":%d", cfg.Port)
+	RegisterS3Routes(mux)
+	CreateDownloadUrl(mux)
+	serverAddr := fmt.Sprintf(":%d", Port)
 	fmt.Printf("Starting HTTP server on %s...\n", serverAddr)
 	if err := http.ListenAndServe(serverAddr, mux); err != nil {
 		log.Fatalf("HTTP server failed: %v", err)
 	}
 }
 
-func CreateDownloadUrl(mux *http.ServeMux, expectedToken string) {
+func CreateDownloadUrl(mux *http.ServeMux) {
 	mux.HandleFunc("POST /{bucketName}/{dir...}", func(w http.ResponseWriter, r *http.Request) {
 		// 1. Validate X-SecretAccessToken header
 		token := r.Header.Get("X-SecretAccessToken")
-		if token == "" || token != expectedToken {
+		if token == "" || token != serviceToken {
 			http.Error(w, "Unauthorized: Invalid or missing X-SecretAccessToken", http.StatusUnauthorized)
 			return
 		}
@@ -61,12 +64,12 @@ func CreateDownloadUrl(mux *http.ServeMux, expectedToken string) {
 	})
 }
 
-func RegisterS3Routes(mux *http.ServeMux, expectedToken string) {
+func RegisterS3Routes(mux *http.ServeMux) {
 	// Go 1.22+ standard router supports method specification (GET) and wildcards ({dir...})
 	mux.HandleFunc("GET /{bucketName}/{dir...}", func(w http.ResponseWriter, r *http.Request) {
 		// 1. Validate X-SecretAccessToken header
 		token := r.Header.Get("X-SecretAccessToken")
-		if token == "" || token != expectedToken {
+		if token == "" || token != serviceToken {
 			http.Error(w, "Unauthorized: Invalid or missing X-SecretAccessToken", http.StatusUnauthorized)
 			return
 		}

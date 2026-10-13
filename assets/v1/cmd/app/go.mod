@@ -1,4 +1,4 @@
-module s3
+module app
 
 go 1.26.4
 

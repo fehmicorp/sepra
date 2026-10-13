@@ -1,6 +1,7 @@
 go 1.26.4
 
 use (
-    ./cmd/s3
+    ./cmd/app
     ./cmd/http
+    ./res
 )

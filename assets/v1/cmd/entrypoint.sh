@@ -71,7 +71,7 @@ echo "MinIO is ready."
 # Use an S3-aware backup process for production.
 
 echo "Initializing SEPRA bucket..."
-/app/sepra-s3
+/app/main
 
 echo "SEPRA initialization completed."
 
@@ -88,6 +88,9 @@ if [ -n "$CF_TOKEN" ]; then
 else
     echo "CF_TOKEN not set; running without Cloudflare Tunnel."
 fi
+
+echo "Initializing HTTP server..."
+/app/http
 
 # Monitor both services. Exit if either required process dies.
 while true; do
