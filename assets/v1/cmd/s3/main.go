@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
-
-	"github.com/fehmicorp/sepra/pkg/sysd/env"
-	"github.com/fehmicorp/sepra/pkg/sysd/utils"
+	"s3/env"
+	"s3/utils"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -51,12 +50,6 @@ func main() {
 		log.Fatalf("Error: %v", err)
 	}
 	fmt.Printf("Timeout in milliseconds: %.0f ms\n", minVal)
-
-	// Parse timeout as time.Duration for MinIO client options
-	// parsedTimeout, err := time.ParseDuration(cfg.Timeout)
-	// if err != nil {
-	// 	parsedTimeout = 30 * time.Second // fallback
-	// }
 
 	// 1. Initialize MinIO client object (using v7 credentials)
 	minioClientAddress := fmt.Sprintf("0.0.0.0:%d", cfg.Port)

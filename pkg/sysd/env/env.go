@@ -3,8 +3,11 @@ package env
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
+
+	"go.yaml.in/yaml/v3"
 )
 
 func LoadConfig(filename string, configPtr interface{}, defaults interface{}) (interface{}, error) {
@@ -16,19 +19,30 @@ func LoadConfig(filename string, configPtr interface{}, defaults interface{}) (i
 	if err := json.Unmarshal(defaultBytes, configPtr); err != nil {
 		return nil, err
 	}
+
 	// 2. Check if the config file exists. If it doesn't, return the default-populated struct.
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		return configPtr, nil
 	}
+
 	// 3. Read the configuration file from disk
 	fileData, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
-	// 4. Unmarshal file contents into the config struct, overriding any defaults
-	if err := json.Unmarshal(fileData, configPtr); err != nil {
-		return nil, err
+
+	// 4. Unmarshal file contents based on file extension (YAML vs JSON)
+	ext := filepath.Ext(filename)
+	if ext == ".yaml" || ext == ".yml" {
+		if err := yaml.Unmarshal(fileData, configPtr); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := json.Unmarshal(fileData, configPtr); err != nil {
+			return nil, err
+		}
 	}
+
 	return configPtr, nil
 }
 
