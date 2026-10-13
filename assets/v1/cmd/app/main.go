@@ -1,11 +1,11 @@
 package main
 
 import (
+	"app/env"
+	"app/utils"
 	"context"
 	"fmt"
 	"log"
-	"github.com/fehmicorp/sepra/pkg/sysd/env"
-	"github.com/fehmicorp/sepra/pkg/sysd/utils"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
