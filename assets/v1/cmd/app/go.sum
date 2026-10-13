@@ -9,6 +9,8 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/fehmicorp/sepra/pkg/sysd v0.0.0-20261010115810-35ac0cf3a278 h1:abq246RxPlz/LxMEPt9TZyM609MU1/ltWtimsl2bkhc=
 github.com/fehmicorp/sepra/pkg/sysd v0.0.0-20261010115810-35ac0cf3a278/go.mod h1:UXp+rAz412n08kRf912PPQziGZ5qIQN7n/2Yxh8nmd8=
+github.com/fehmicorp/sepra/pkg/sysd v0.0.0-20261013124215-bca0c56ab59e h1:PVvEE/nrC8/neFmJkC4pOiW5syN8Idqo5FS+wdiFR/Y=
+github.com/fehmicorp/sepra/pkg/sysd v0.0.0-20261013124215-bca0c56ab59e/go.mod h1:XcGu9cGQyjso0i2CY79N5KCyZcmflFkM+tvtVq+L89g=
 github.com/go-ini/ini v1.67.0 h1:z6ZrTEZqSWOTyH2FlglNbNgARyHG8oLW9gMELqKr06A=
 github.com/go-ini/ini v1.67.0/go.mod h1:ByCAeIL28uOIIG0E3PJtZPDL8WnHpFKFOtgjp+3Ies8=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=

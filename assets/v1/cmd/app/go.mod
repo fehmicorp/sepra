@@ -11,7 +11,7 @@ require (
 	github.com/caarlos0/env/v10 v10.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/fehmicorp/sepra/pkg/sysd v0.0.0-20261010115810-35ac0cf3a278 // indirect
+	github.com/fehmicorp/sepra/pkg/sysd v0.0.0-20261013124215-bca0c56ab59e // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.19.2 // indirect

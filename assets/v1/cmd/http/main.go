@@ -7,8 +7,9 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"res/env"
 	"time"
+
+	"github.com/fehmicorp/sepra/pkg/sysd/env"
 
 	"github.com/minio/minio-go/v7"
 )
