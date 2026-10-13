@@ -2,16 +2,18 @@ package env
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
 
+	"github.com/caarlos0/env/v10"
 	"go.yaml.in/yaml/v3"
 )
 
 func LoadConfig(filename string, configPtr interface{}, defaults interface{}) (interface{}, error) {
-	// 1. Pre-populate configPtr with default values by marshaling and unmarshaling defaults
+	// 1. Pre-populate configPtr with default values
 	defaultBytes, err := json.Marshal(defaults)
 	if err != nil {
 		return nil, err
@@ -20,27 +22,28 @@ func LoadConfig(filename string, configPtr interface{}, defaults interface{}) (i
 		return nil, err
 	}
 
-	// 2. Check if the config file exists. If it doesn't, return the default-populated struct.
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		return configPtr, nil
-	}
-
-	// 3. Read the configuration file from disk
-	fileData, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	// 4. Unmarshal file contents based on file extension (YAML vs JSON)
-	ext := filepath.Ext(filename)
-	if ext == ".yaml" || ext == ".yml" {
-		if err := yaml.Unmarshal(fileData, configPtr); err != nil {
+	// 2. Read the configuration file from disk if it exists
+	if _, err := os.Stat(filename); err == nil {
+		fileData, err := os.ReadFile(filename)
+		if err != nil {
 			return nil, err
 		}
-	} else {
-		if err := json.Unmarshal(fileData, configPtr); err != nil {
-			return nil, err
+
+		ext := filepath.Ext(filename)
+		if ext == ".yaml" || ext == ".yml" {
+			if err := yaml.Unmarshal(fileData, configPtr); err != nil {
+				return nil, err
+			}
+		} else {
+			if err := json.Unmarshal(fileData, configPtr); err != nil {
+				return nil, err
+			}
 		}
+	}
+
+	// 3. Parse environment variables LAST so they override both defaults and file values
+	if err := env.Parse(configPtr); err != nil {
+		return nil, fmt.Errorf("failed to parse environment variables: %w", err)
 	}
 
 	return configPtr, nil
