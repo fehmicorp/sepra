@@ -8,7 +8,6 @@ import (
 	"log"
 
 	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 var minioClient *minio.Client
@@ -50,19 +49,7 @@ func main() {
 		log.Fatalf("Error: %v", err)
 	}
 	fmt.Printf("Timeout in milliseconds: %.0f ms\n", minVal)
-
-	// 1. Initialize MinIO client object (using v7 credentials)
-	minioClient, err = minio.New("localhost:9090", &minio.Options{
-		Creds:        credentials.NewStaticV4(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
-		Secure:       cfg.UseSSL,
-		MaxRetries:   cfg.MaxConnections,
-		BucketLookup: minio.BucketLookupAuto,
-	})
-
-	if err != nil {
-		log.Fatalln("Failed to initialize MinIO client:", err)
-	}
-
+	minioClient, _ = Client()
 	// 2. Check and Create Bucket
 	bucketName := "bin"
 	location := cfg.Region

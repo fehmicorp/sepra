@@ -105,6 +105,8 @@ github.com/bombsimon/wsl/v5 v5.8.0/go.mod h1:AbOLsulgkqP4ZnitHf9gwPtCOGlrzkk0jb0
 github.com/bombsimon/wsl/v5 v5.9.0/go.mod h1:kjo4HiAV5FDkHC8/uzJq9mBffEEd6WT/nvN7DoMovDM=
 github.com/breml/bidichk v0.3.3/go.mod h1:ISbsut8OnjB367j5NseXEGGgO/th206dVa427kR8YTE=
 github.com/breml/errchkjson v0.4.1/go.mod h1:a23OvR6Qvcl7DG/Z4o0el6BRAjKnaReoPQFciAl9U3s=
+github.com/bsm/ginkgo/v2 v2.12.0/go.mod h1:SwYbGRRDovPVboqFv0tPTcG1sN61LM1Z4ARdbAV9g4c=
+github.com/bsm/gomega v1.27.10/go.mod h1:JyEr/xRbxbtgWNi8tIEVPUYZ5Dzef52k01W3YH0H+O0=
 github.com/buger/jsonparser v1.6.1/go.mod h1:6RYKKt7H4d4+iWqouImQ9R2FZql3VbhNgx27UK13J/0=
 github.com/butuzov/ireturn v0.4.1/go.mod h1:q+DXKzTDV5guNuXLnIab9fKXizTn2miZHLhxH7V/GB4=
 github.com/butuzov/mirror v1.3.0/go.mod h1:AEij0Z8YMALaq4yQj9CPPVYOyJQyiexpQEQgihajRfI=

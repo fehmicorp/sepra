@@ -29,6 +29,6 @@ RUN chmod 0755 \
     /app/entrypoint.sh \
     && mkdir -p /data /backup \
     && sed -i 's/\r$//' /app/entrypoint.sh
-EXPOSE 9090 9091
+EXPOSE 9090 9091 9098
 VOLUME ["/data", "/backup"]
 ENTRYPOINT ["/bin/sh", "/app/entrypoint.sh"]

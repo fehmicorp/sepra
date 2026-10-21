@@ -3,14 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"http/env"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
-	"http/env"
 
 	"github.com/minio/minio-go/v7"
+	"github.com/redis/go-redis/v9"
 )
 
 var minioClient *minio.Client
@@ -18,10 +20,16 @@ var cfg *Config
 var (
 	serviceToken = env.GetString("APP_SECRET_ACCESS_TOKEN", "")
 	Port         = env.GetInt("APP_PORT", 9098)
+	Ver          = env.GetString("VERSION", "v1")
+	redisClient  *redis.Client
+	ctx          = context.Background()
 )
 
 func main() {
-	fmt.Println(Port)
+	if os.Getenv("REDIS_HOST") != "" {
+		InitRedis()
+	}
+	minioClient, _ = Client()
 	mux := http.NewServeMux()
 	RegisterS3Routes(mux)
 	CreateDownloadUrl(mux)
@@ -33,7 +41,8 @@ func main() {
 }
 
 func CreateDownloadUrl(mux *http.ServeMux) {
-	mux.HandleFunc("POST /{bucketName}/{dir...}", func(w http.ResponseWriter, r *http.Request) {
+	pattern := fmt.Sprintf("POST /%s/{bucketName}/{dir...}", Ver)
+	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 		// 1. Validate X-SecretAccessToken header
 		token := r.Header.Get("X-SecretAccessToken")
 		if token == "" || token != serviceToken {
@@ -49,7 +58,6 @@ func CreateDownloadUrl(mux *http.ServeMux) {
 		}
 
 		// 3. Generate MinIO Presigned Download URL (valid for 2 hours)
-		ctx := context.Background()
 		reqParams := make(url.Values)
 		presignedURL, err := minioClient.PresignedGetObject(ctx, bucketName, objectName, 2*time.Hour, reqParams)
 		if err != nil {
@@ -57,20 +65,66 @@ func CreateDownloadUrl(mux *http.ServeMux) {
 			return
 		}
 
-		// 4. Return the signed URL as a JSON response
+		// 4. Generate a secure random unique download token
+		downloadToken := generateSecureToken(32)
+
+		// 5. Store the presigned URL in Redis with a 2-hour TTL
+		redisKey := fmt.Sprintf("dl_token:%s", downloadToken)
+		err = redisClient.Set(ctx, redisKey, presignedURL.String(), 2*time.Hour).Err()
+		if err != nil {
+			http.Error(w, "Failed to cache download token", http.StatusInternalServerError)
+			return
+		}
+
+		// 6. Return the downloadable endpoint link as JSON
+		downloadEndpoint := fmt.Sprintf("http://localhost:%d/%s/download?token=%s", Port, Ver, downloadToken)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(fmt.Sprintf(`{"url":"%s"}`, presignedURL.String())))
+		_, _ = w.Write([]byte(fmt.Sprintf(`{"download_url":"%s"}`, downloadEndpoint)))
+
+		// // 4. Return the signed URL as a JSON response
+		// w.Header().Set("Content-Type", "application/json")
+		// w.WriteHeader(http.StatusOK)
+		// _, _ = w.Write([]byte(fmt.Sprintf(`{"url":"%s"}`, presignedURL.String())))
+	})
+}
+
+func Download(mux *http.ServeMux, Ver string) {
+	pattern := fmt.Sprintf("GET /%s/download", Ver)
+	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+		// 1. Extract token from query parameters
+		downloadToken := r.URL.Query().Get("token")
+		if downloadToken == "" {
+			http.Error(w, "Bad Request: Missing download token", http.StatusBadRequest)
+			return
+		}
+
+		// 2. Verify token in Redis and retrieve the stored MinIO presigned URL
+		redisKey := fmt.Sprintf("dl_token:%s", downloadToken)
+		presignedURL, err := redisClient.Get(ctx, redisKey).Result()
+		if err == redis.Nil {
+			http.Error(w, "Unauthorized or Expired: Invalid download link", http.StatusUnauthorized)
+			return
+		} else if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		// (Optional) Delete token immediately after use for single-use download links:
+		// _ = redisClient.Del(ctx, redisKey)
+
+		// 3. Redirect client to the presigned MinIO URL to initiate download/stream
+		http.Redirect(w, r, presignedURL, http.StatusTemporaryRedirect)
 	})
 }
 
 func RegisterS3Routes(mux *http.ServeMux) {
-	// Go 1.22+ standard router supports method specification (GET) and wildcards ({dir...})
-	mux.HandleFunc("GET /{bucketName}/{dir...}", func(w http.ResponseWriter, r *http.Request) {
+	pattern := fmt.Sprintf("GET /%s/{bucketName}/{dir...}", Ver)
+	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 		// 1. Validate X-SecretAccessToken header
 		token := r.Header.Get("X-SecretAccessToken")
 		if token == "" || token != serviceToken {
-			http.Error(w, "Unauthorized: Invalid or missing X-SecretAccessToken", http.StatusUnauthorized)
+			http.Error(w, "Unauthorized: Invalid Request", http.StatusUnauthorized)
 			return
 		}
 
