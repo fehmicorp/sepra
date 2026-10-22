@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/minio/minio-go/v7"
@@ -31,8 +33,10 @@ func main() {
 	}
 	minioClient, _ = Client()
 	mux := http.NewServeMux()
-	RegisterS3Routes(mux)
+	ViewOnly(mux)
 	CreateDownloadUrl(mux)
+	Download(mux)
+	StrAssets(mux)
 	serverAddr := fmt.Sprintf(":%d", Port)
 	fmt.Printf("Starting HTTP server on %s...\n", serverAddr)
 	if err := http.ListenAndServe(serverAddr, mux); err != nil {
@@ -89,7 +93,7 @@ func CreateDownloadUrl(mux *http.ServeMux) {
 	})
 }
 
-func Download(mux *http.ServeMux, Ver string) {
+func Download(mux *http.ServeMux) {
 	pattern := fmt.Sprintf("GET /%s/download", Ver)
 	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 		// 1. Extract token from query parameters
@@ -99,9 +103,9 @@ func Download(mux *http.ServeMux, Ver string) {
 			return
 		}
 
-		// 2. Verify token in Redis and retrieve the stored MinIO presigned URL
+		// 2. Verify token in Redis and retrieve the stored bucket/object path
 		redisKey := fmt.Sprintf("dl_token:%s", downloadToken)
-		presignedURL, err := redisClient.Get(ctx, redisKey).Result()
+		signedURL, err := redisClient.Get(ctx, redisKey).Result()
 		if err == redis.Nil {
 			http.Error(w, "Unauthorized or Expired: Invalid download link", http.StatusUnauthorized)
 			return
@@ -110,15 +114,90 @@ func Download(mux *http.ServeMux, Ver string) {
 			return
 		}
 
-		// (Optional) Delete token immediately after use for single-use download links:
-		// _ = redisClient.Del(ctx, redisKey)
+		// (Optional) Uncomment below if you want the link to be strictly single-use:
+		_ = redisClient.Del(ctx, redisKey)
 
-		// 3. Redirect client to the presigned MinIO URL to initiate download/stream
-		http.Redirect(w, r, presignedURL, http.StatusTemporaryRedirect)
+		// 3. Fetch the file using the pre-signed MinIO URL
+		resp, err := http.Get(signedURL)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			http.Error(w, "Failed to fetch object from storage backend", http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+
+		// 4. Extract file name from the URL path or default to download
+		u, err := url.Parse(signedURL)
+		fileName := "downloaded-file"
+		if err == nil {
+			fileName = path.Base(u.Path)
+		}
+
+		// 5. Set headers to force file download and stream content
+		if resp.Header.Get("Content-Type") != "" {
+			w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+		} else {
+			w.Header().Set("Content-Type", "application/octet-stream")
+		}
+
+		if resp.ContentLength > 0 {
+			w.Header().Set("Content-Length", fmt.Sprintf("%d", resp.ContentLength))
+		}
+
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fileName))
+		w.WriteHeader(http.StatusOK)
+
+		// 6. Stream the response body directly to the client
+		if _, err := io.Copy(w, resp.Body); err != nil {
+			return
+		}
+	})
+}
+func StrAssets(mux *http.ServeMux) {
+	pattern := fmt.Sprintf("GET /%s/str/{bucketName}/{dir...}", Ver)
+	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+		// 1. Validate Cookie for access token
+		cookie, err := r.Cookie("token")
+		if err != nil || cookie.Value == "" || cookie.Value != serviceToken {
+			http.Error(w, "Unauthorized: Invalid Request", http.StatusUnauthorized)
+			return
+		}
+
+		// 2. Extract path parameters
+		bucketName := r.PathValue("bucketName")
+		objectName := r.PathValue("dir")
+		if bucketName == "" || objectName == "" {
+			http.Error(w, "Bad Request: Missing bucket name or file path", http.StatusBadRequest)
+			return
+		}
+
+		// 3. Fetch object from MinIO
+		ctx := context.Background()
+		object, err := minioClient.GetObject(ctx, bucketName, objectName, minio.GetObjectOptions{})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to retrieve object: %v", err), http.StatusInternalServerError)
+			return
+		}
+		defer object.Close()
+
+		// 4. Verify object existence and metadata
+		objectInfo, err := object.Stat()
+		if err != nil {
+			http.Error(w, "Object not found", http.StatusNotFound)
+			return
+		}
+
+		// 5. Set headers and stream the object response back
+		w.Header().Set("Content-Type", objectInfo.ContentType)
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", objectInfo.Size))
+		w.WriteHeader(http.StatusOK)
+
+		if _, err := io.Copy(w, object); err != nil {
+			return
+		}
 	})
 }
 
-func RegisterS3Routes(mux *http.ServeMux) {
+func ViewOnly(mux *http.ServeMux) {
 	pattern := fmt.Sprintf("GET /%s/{bucketName}/{dir...}", Ver)
 	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 		// 1. Validate X-SecretAccessToken header
@@ -137,8 +216,60 @@ func RegisterS3Routes(mux *http.ServeMux) {
 			return
 		}
 
-		// 3. Fetch object from MinIO
+		// 3. Check if the request prefers HTML (browser view) vs raw asset fetch
+		acceptHeader := r.Header.Get("Accept")
+		isBrowserView := strings.Contains(acceptHeader, "text/html")
+
 		ctx := context.Background()
+
+		if isBrowserView {
+			// Serve a protected HTML viewer wrapper that blocks right-clicks and downloads
+			htmlContent := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+    <title>Secure View - SEPRA</title>
+    <style>
+        body {
+            margin: 0;
+            background: #0f172a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        img, video {
+            max-width: 100%%;
+            max-height: 100%%;
+            pointer-events: none; /* Disables dragging/saving via context */
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+    <img src="/%s/%s/%s" alt="Protected Asset" />
+    <script>
+        // Disable keyboard shortcuts for saving/printing/inspecting
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && (e.key === 's' || e.key === 'p' || e.key === 'u' || e.key === 'i')) {
+                e.preventDefault();
+                alert('Action restricted by SEPRA security policy.');
+            }
+        });
+        // Disable drag and drop
+        document.addEventListener('dragstart', function(e) { e.preventDefault(); });
+    </script>
+</body>
+</html>`, Ver, bucketName, objectName)
+
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(htmlContent))
+			return
+		}
+
+		// 4. Fetch raw object from MinIO for direct rendering/embedding
 		object, err := minioClient.GetObject(ctx, bucketName, objectName, minio.GetObjectOptions{})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to retrieve object: %v", err), http.StatusInternalServerError)
@@ -146,20 +277,22 @@ func RegisterS3Routes(mux *http.ServeMux) {
 		}
 		defer object.Close()
 
-		// 4. Verify object metadata / existence
+		// 5. Verify object metadata / existence
 		objectInfo, err := object.Stat()
 		if err != nil {
 			http.Error(w, "Object not found", http.StatusNotFound)
 			return
 		}
 
-		// 5. Set headers and stream response
+		// 6. Set headers for secure inline viewing and disable caching
 		w.Header().Set("Content-Type", objectInfo.ContentType)
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", objectInfo.Size))
+		w.Header().Set("Content-Disposition", "inline") // Render in browser, don't force download
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.WriteHeader(http.StatusOK)
 
 		if _, err := io.Copy(w, object); err != nil {
-			// Handle client disconnection or network interruption during streaming
 			return
 		}
 	})
