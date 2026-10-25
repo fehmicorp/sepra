@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"http/env"
+	"log"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -35,14 +37,20 @@ func Client() (*minio.Client, error) {
 }
 
 func InitRedis() {
-	redisHost := env.GetString("REDIS_HOST", "localhost:6379")
-	redisPassword := env.GetString("REDIS_PASSWORD", "")
-	redisDb := env.GetInt("REDIS_DB", 0)
+	redisHost := env.GetString("VALKEY_HOST", env.GetString("REDIS_HOST", "localhost:6379"))
+	redisPassword := env.GetString("VALKEY_PASSWORD", env.GetString("REDIS_PASSWORD", ""))
+	redisDb := env.GetInt("VALKEY_DB", env.GetInt("REDIS_DB", 0))
 	redisClient = redis.NewClient(&redis.Options{
 		Addr:     redisHost,
 		Password: redisPassword,
 		DB:       redisDb,
 	})
+	ctx := context.Background()
+	if err := redisClient.Ping(ctx).Err(); err != nil {
+		log.Fatalf("Failed to connect to Valkey/Redis server at %s: %v", redisHost, err)
+	}
+
+	log.Printf("Successfully connected to Valkey/Redis server at %s", redisHost)
 }
 
 func generateSecureToken(length int) string {
